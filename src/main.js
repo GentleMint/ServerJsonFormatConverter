@@ -10,6 +10,21 @@ const path = require('path');
 
 const log = console.log.bind(console);
 
+function readdirSyncRec(source) {
+    let res = fs.readdirSync(source);
+    let files = [];
+
+    res.map(e => path.join(source, e)).forEach(e => {
+        if (fs.statSync(e).isFile()) {
+            files.push(e);
+        } else {
+            files = files.concat(readdirSyncRec(e));
+        }
+    });
+
+    return files;
+}
+
 function validateConfig(config) {
     log(`config is: ${JSON.stringify(config)}`);
 
@@ -31,8 +46,9 @@ function validateConfig(config) {
     if (fs.statSync(source).isFile()) {
         sourceFiles.push(source);
     } else {
-        // TODO: traverse recursively
-        sourceFiles = fs.readdirSync(source).map(f => path.join(source, f));
+        sourceFiles = readdirSyncRec(source);
+        log(`detected source files to be convert:`);
+        log(sourceFiles);
     }
 
     if (sourceFiles.length === 0) {
@@ -165,16 +181,39 @@ function convertFormat(srcFile, tgtDir, srcFormat) {
     }
 
     // save file
-    let srcFileName = srcFile.split(path.sep)[srcFile.split(path.sep).length - 1];
-    let tgtFile = path.join(tgtDir, srcFileName);
+    let tgtFileSubPath = getTgtFileSubPath(srcFile, config);
+
+    let tgtFile = path.join(tgtDir, tgtFileSubPath);
+
+    // ensure tgt file subpath exists
+    let tgtFolder = tgtFile.split(path.sep);
+    tgtFolder.pop();
+    tgtFolder = tgtFolder.join(path.sep);
+
+    if (!fs.existsSync(tgtFolder)) {
+        fs.mkdirSync(tgtFolder, { recursive: true });
+    }
+
     fs.writeFileSync(tgtFile, JSON.stringify(data));
     log(`Converted ${srcFile} with ${srcFormat} to ${tgtFile}`);
+}
+
+function getTgtFileSubPath(srcFile, config) {
+    if (fs.statSync(config.source).isFile()) {
+        // get file name
+        return srcFile.split(path.sep)[srcFile.split(path.sep).length - 1];
+    } else {
+        // keep subfolder
+        return srcFile.split(config.source)[1];
+    }
 }
 
 function convertAll() {
     if (!validateConfig(config)) {
         return;
     }
+
+    log(config.sourceFiles);
 
     for (let file of config.sourceFiles) {
         try {

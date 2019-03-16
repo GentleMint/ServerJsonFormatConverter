@@ -6,7 +6,7 @@ module.exports = {
     // target: {
 
     // },
-    source: '../data',
+    source: '../json',
     target: '',
     format: ''
 }
